@@ -1,0 +1,133 @@
+
+//******************************************/
+// Universidad del Valle de Guatemala
+// BE3029 - Electronica Digital 2
+//Stephany Mejia
+// 03/11/2026
+//Bluetooth
+// MCU: ESP32 dev kit 1.0
+//******************************************/
+
+ //******************************************/
+ // Librerias
+ //******************************************/
+ #include <Arduino.h>
+ #include <stdint.h>
+
+ // Habilitar el modulo Gamepad de Dabble
+ #define CUSTOM_SETTINGS
+ #define INCLUDE_GAMEPAD_MODULE
+ #include <DabbleESP32.h>
+
+ //******************************************/
+ // Definiciones
+ //******************************************/
+ #define RX_NUCLEO 16
+ #define TX_NUCLEO 17
+
+ //******************************************/
+ // Prototipos de funciones
+ //******************************************/
+ void EnviarComando(char comando);
+
+ //******************************************/
+ // Variables globales
+ //******************************************/
+
+ // UART2 para comunicarse con la Nucleo 1
+ HardwareSerial SerialNucleo(2);
+
+ // Estados anteriores de los botones
+ bool anteriorLectura = false;
+ bool anteriorGuardado = false;
+ bool anteriorInicio = false;
+
+ //******************************************/
+ // ISRs Rutinas de Interrupcion
+ //******************************************/
+
+ // No se utilizan interrupciones en esta prueba
+
+ //******************************************/
+ // Configuracion
+ //******************************************/
+ void setup() {
+
+   // Iniciar monitor serial
+   Serial.begin(115200);
+
+   // Iniciar Bluetooth BLE con Dabble
+   Dabble.begin("VitaCheck");
+
+   // Configurar UART2: 115200, RX16, TX17
+   SerialNucleo.begin(115200, SERIAL_8N1,
+                      RX_NUCLEO, TX_NUCLEO);
+
+   Serial.println("VitaCheck listo");
+   Serial.println("Esperando comandos de Dabble...");
+ }
+
+ //******************************************/
+ // Loop Principal
+ //******************************************/
+ void loop() {
+
+   // Procesar los datos recibidos por Bluetooth
+   Dabble.processInput();
+
+   // Leer los botones del Gamepad
+   bool lectura = GamePad.isTrianglePressed();
+   bool guardado = GamePad.isSquarePressed();
+   bool inicio = GamePad.isCirclePressed();
+
+   // Triangulo: solicitar lectura
+   if (lectura && !anteriorLectura) {
+     EnviarComando('T');
+   }
+
+   // Cuadrado: solicitar guardado
+   if (guardado && !anteriorGuardado) {
+     EnviarComando('G');
+   }
+
+   // Circulo: reproducir melodia de inicio
+   if (inicio && !anteriorInicio) {
+     EnviarComando('I');
+   }
+
+   // Guardar estados para detectar nuevas pulsaciones
+   anteriorLectura = lectura;
+   anteriorGuardado = guardado;
+   anteriorInicio = inicio;
+// Mostrar respuestas recibidas desde Nucleo 1
+  // Recibir respuestas de la Nucleo 1
+  while (SerialNucleo.available()) {
+
+    char respuesta = SerialNucleo.read();
+
+    // Confirmacion de guardado exitoso
+    if (respuesta == 'K') {
+      Serial.println("SD guardada");
+    }
+    else {
+      Serial.write(respuesta);
+    }
+  }
+
+   delay(10);
+ }
+
+ //******************************************/
+ // Otras funciones
+ //******************************************/
+
+ // Enviar una letra a Nucleo 1 por UART2
+ void EnviarComando(char comando) {
+
+   // Transmitir el comando
+   SerialNucleo.write(comando);
+
+   // Mostrar el comando en la computadora
+   Serial.print("Comando enviado: ");
+   Serial.println(comando);
+ }
